@@ -18,9 +18,10 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument("project", help="project name")
         parser.add_argument("-p", "--path", dest="base_path",
-                            help="The root path")
+                            help="The root path", default=self.base_path)
         parser.add_argument("-v", "--virtualenv", dest="virtenv",
-                            help="The path to the virtualenv")
+                            help="The path to the virtualenv",
+                            default=self.virtual_envs_path)
 
     def handle(self, *args, **options):
         y = raw_input("Continue? [y,n] > ")
