@@ -27,3 +27,11 @@ class Command(BaseCommand):
         y = raw_input("Continue? [y,n] > ")
         if y.lower() not in ["y", "yes"]:
             raise CommandError("Canceled before ending.")
+        #  locate virtual env by inspecting os.environ
+        #  create virtualenv
+        #  configure pip source (.pip/pip.conf)
+        #  install package using pip
+        #  deploy config file
+        #  deploy apache file
+        #  email config
+        #  DB config
