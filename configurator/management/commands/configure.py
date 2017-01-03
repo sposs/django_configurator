@@ -33,12 +33,13 @@ class Command(BaseCommand):
         parser.add_argument("--pipuser", help="the pip username", dest="pipuser")
         parser.add_argument("--piphost", help="the pip server", dest="piphost")
         parser.add_argument("--pipport", help="the pip port", dest="pipport")
+        parser.add_argument("--pipsecure", help="the pip server uses https", dest="pipsecure", action="store_true")
 
     def handle(self, *args, **options):
         y = raw_input("Continue? [y,n] > ")
         if y.lower() not in ["y", "yes"]:
             raise CommandError("Canceled before ending.")
-
+        #  handle the pip config file
         if "HOME" in os.environ and options.get("piphost"):
             if not options.get("pippass") or not options.get("pipuser"):
                 raise CommandError("You must specify the pip pass and user.")
@@ -50,7 +51,8 @@ class Command(BaseCommand):
                 "username": options.get("pipuser"),
                 "password": options.get("pippass"),
                 "host": options.get("piphost"),
-                "port": options.get("pipport")
+                "port": options.get("pipport"),
+                "secure": options.get("pipsecure")
             }
             t = get_template("pip.conf")
             c = Context(pipconf)
