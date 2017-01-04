@@ -98,3 +98,28 @@ def get_secret(setting, default=None, secrets=None):
     if secrets is None:
         secrets = dj_secrets
     return get_config(setting, default, secrets, "secrets file")
+
+
+def get_server_install_cmd(server_type):
+    """
+    Depending on the platform, we want to install some modules for the server
+    :param str server_type: a server type, e.g. apache or nginx
+    :return: str
+    """
+    if server_type == "apache":
+        return "apt-get install apache2 libapache2-mod-wsgi"
+    elif server_type == "django":
+        return None  # nothing special to do for django runserver
+    elif server_type is None:
+        return None
+    else:
+        raise NotImplementedError
+
+
+def handle_server_config(server_type, project_name, project_path):
+    if server_type == "apache":
+        return "apache_conf.conf", {}
+    elif server_type is None:
+        return None, None
+    else:
+        raise NotImplementedError
