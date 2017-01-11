@@ -1,16 +1,8 @@
 #!/bin/bash
+export LC_ALL=$LANG
 {% if not virtenv_exists %}
 # create env directory
 mkdir -p {{ workonhome }}
-{% endif %}
-{% if server_install_cmd %}
-# install requested server if needed
-{{ server_install_cmd }}
-install_res=$?
-if [ ${install_res} != '0' ]; then
-   # in case of error, exit
-   exit ${install_res}
-fi
 {% endif %}
 # configure the virtual env
 export WORKON_HOME={{ workonhome }}
@@ -26,6 +18,7 @@ mkvirtualenv {{ project }}
 workon {{ project }}
 {% endif %}
 # install or update
+pip install django_configurator
 {% if update %}
 pip install --upgrade --no-deps {{ project }}
 pip install {{ project }}

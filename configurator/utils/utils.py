@@ -2,9 +2,13 @@
 """
 Copyright 2016
 """
-
+import getpass
 import json
 import os
+import tempfile
+
+from django.template.context import Context
+from django.template.loader import get_template
 
 from configurator.exceptions import SettingsMissing, ConfigMissing, BadConfig
 
@@ -100,26 +104,13 @@ def get_secret(setting, default=None, secrets=None):
     return get_config(setting, default, secrets, "secrets file")
 
 
-def get_server_install_cmd(server_type):
+def locate_activate_this(path):
     """
-    Depending on the platform, we want to install some modules for the server
-    :param str server_type: a server type, e.g. apache or nginx
-    :return: str
+    Find the activate_this.py, needed
+    :param path:
+    :return:
     """
-    if server_type == "apache":
-        return "apt-get install apache2 libapache2-mod-wsgi"
-    elif server_type == "django":
-        return None  # nothing special to do for django runserver
-    elif server_type is None:
-        return None
-    else:
-        raise NotImplementedError
-
-
-def handle_server_config(server_type, project_name, project_path):
-    if server_type == "apache":
-        return "apache_conf.conf", {}
-    elif server_type is None:
-        return None, None
-    else:
-        raise NotImplementedError
+    file_to_find = "activate_this.py"
+    for element in os.walk(path):
+        if file_to_find in element[2]:
+            return os.path.join(element[1], file_to_find)

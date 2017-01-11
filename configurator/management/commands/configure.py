@@ -3,6 +3,7 @@
 Copyright 2016 S. Poss
 """
 import subprocess
+import pexpect
 import tempfile
 import pkg_resources
 from django.core.management.base import BaseCommand, CommandError
@@ -11,13 +12,13 @@ import os
 
 from django.template.context import Context
 from django.template.loader import get_template
-
-from configurator.utils import get_server_install_cmd, handle_server_config
+from configurator.utils.database import configure_database
+from configurator.utils.pip_config import handle_pip_config
+from configurator.utils.server import install_server
+from configurator.utils.utils import locate_activate_this
 
 __author__ = 'sposs'
 
-
-SERVER_CONFIG = {"apache": "/etc/apache2/sites-enabled/"}
 
 class Command(BaseCommand):
     base_path = "/opt"
@@ -42,6 +43,8 @@ class Command(BaseCommand):
         parser.add_argument("--dev", dest="test", action="store_true", help="Do not run anything, "
                                                                             "only dump the templates")
         parser.add_argument("-s", "--server", dest="server", choices=["apache", "nginx", "django"])
+        parser.add_argument("-d", "--dbtype", dest="dbtype", choices=["postgres", "mysql", "mongo", "sqlite"])
+        parser.add_argument("--dbname", dest="dbname", help="The name of the database")
         parser.add_argument("--update", dest="update", help="run the update of the project?", action="store_true")
 
     def handle(self, *args, **options):
@@ -51,35 +54,29 @@ class Command(BaseCommand):
 
         self.virtual_envs_path = options.get("virtenv")
         self.test = options.get("test", False)
+
         #  handle the pip config file
         if "HOME" in os.environ:
             if options.get("piphost"):
-                if not options.get("pippass") or not options.get("pipuser"):
-                    raise CommandError("You must specify the pip pass and user.")
-                pip_conf_dir = os.path.join(os.environ["HOME"], ".pip")
-                if not os.path.isdir(pip_conf_dir):
-                    os.makedirs(pip_conf_dir)
-                pip_conf = os.path.join(pip_conf_dir, "pip.conf")
-                pipconf = {
-                    "username": options.get("pipuser"),
-                    "password": options.get("pippass"),
-                    "host": options.get("piphost"),
-                    "port": options.get("pipport"),
-                    "secure": options.get("pipsecure")
-                }
-                t = get_template("pip.conf")
-                c = Context(pipconf)
-                pipconf = t.render(c)
-                if self.test:
-                    self.stdout.write(pipconf)
-                else:
-                    try:
-                        with open(pip_conf, "w") as conf:
-                            conf.write(pipconf)
-                    except OSError:
-                        raise CommandError("Cannot modify the pip.conf, make sure you have the proper rights.")
+                handle_pip_config(options, self.stdout, self.test)
         else:
             self.stderr.write("The HOME directory is not defined, cannot overwrite the pip config file")
+
+        #  install base packages
+        t = get_template("base.sh")
+        _, t_path = tempfile.mkstemp(suffix="base.sh")
+        with open(t_path, "w") as f:
+            f.write(t.render())
+        os.chmod(t_path, 0o0755)
+        if not self.test:
+            output = ""
+            try:
+                output = subprocess.check_output(t_path)
+            except subprocess.CalledProcessError:
+                self.stdout.write(output)
+                raise CommandError("Failed the installation of basic packages")
+        else:
+            self.stdout.write(t.render())
         try:
             os.makedirs(os.path.join(self.virtual_envs_path, "test233421"))
         except OSError:
@@ -90,15 +87,27 @@ class Command(BaseCommand):
         project_name = _requirement.project_name
         project_path = os.path.join(self.virtual_envs_path, project_name)
         virtenv_dir_exists = os.path.isdir(self.virtual_envs_path)
-        server_type = options.get("server")
 
-        server_install_cmd = get_server_install_cmd(server_type)
+        #  handle the DB installation + configuration
+        db_type = options.get("dbtype")
+        dbname = options.get("dbname")
+        db_user = db_pass = None
+        if db_type:
+            db_user, db_pass = configure_database(db_type, dbname, self.stdout, self.test)
+
+        #  handle the server installation
+        server_type = options.get("server")
+        if server_type:
+            all_ok = install_server(server_type, project_name, project_path, self.stdout, self.test)
+            if not all_ok:
+                raise CommandError("Failed installing the DB")
+
+        #  the basic script: install packages, configure the virtualenv
         setup_params = {
             "virtenv_exists": virtenv_dir_exists,
             "workonhome": self.virtual_envs_path,
             "make_env_dir": not os.path.isdir(project_path),
             "project": project_name,
-            "server_install_cmd": server_install_cmd,
             "update": options.get("update"),
             "requirement": str(_requirement)
         }
@@ -108,37 +117,27 @@ class Command(BaseCommand):
         if self.test:
             self.stdout.write(setup_script)
         else:
-            tmpf = tempfile.mktemp()
+            _, tmpf = tempfile.mkstemp()
             with open(tmpf, "w") as script:
                 script.write(setup_script)
-            os.chmod(tmpf, 0755)
-            output = ""
+            os.chmod(tmpf, 0o0755)
+            signal = status = 0
             try:
-                output = subprocess.check_output(tmpf)
-            except subprocess.CalledProcessError:
-                self.stderr.write(output)
-                raise CommandError("Failed to install the script")
+                child = pexpect.spawn(tmpf)
+                child.logfile_read = self.stdout
+                child.expect(pexpect.EOF)
+                child.close()
+                status, signal = child.exitstatus, child.signalstatus
+            except Exception as err:
+                self.stderr.write(str(err))
+                raise CommandError("Failed to execute the install script")
             finally:
                 os.unlink(tmpf)
+            if status:
+                raise CommandError("Failed to execute install script")
+        activate_this = locate_activate_this(project_path)
 
-        try:
-            t_name, t_dict = handle_server_config(server_type, project_name, project_path)
-        except Exception as err:
-            raise CommandError(err)
-        if t_name:
-            t = get_template(t_name)
-            c = Context(t_dict)
-            server_config = t.render(c)
-            if self.test:
-                self.stdout.write(server_config)
-            else:
-                path = SERVER_CONFIG.get(server_type)
-                with open(os.path.join(path, project_name+".conf"), "w") as s_cnf:
-                    s_cnf.write(server_config)
-        #  locate virtual env by inspecting os.environ
-        #  create virtualenv
-        #  configure pip source (.pip/pip.conf)
-        #  install package using pip
+
         #  deploy config file
         #  deploy apache file
         #  email config
