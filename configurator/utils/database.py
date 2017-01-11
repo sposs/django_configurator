@@ -118,7 +118,7 @@ def configure_database(db_type, dbname, output, test=True):
     """
     if not db_type:
         return None, None
-    output.write("Installing the DB")
+    output.write(">> Installing the DB")
     install_cmd = get_db_install_cmd(db_type)
     if not test:
         try:
@@ -136,7 +136,9 @@ def configure_database(db_type, dbname, output, test=True):
     if not test:
         try:
             out = subprocess.check_output(db_pre_checks)
-        except subprocess.CalledProcessError:
+            output.write(out)
+        except subprocess.CalledProcessError as err:
+            output.write(err.output)
             raise CommandError("Failed to execute the pre-checks")
         if dbuser in out:
             user_exists = True

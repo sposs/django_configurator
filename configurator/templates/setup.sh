@@ -4,21 +4,19 @@ export LC_ALL=$LANG
 # create env directory
 mkdir -p {{ workonhome }}
 {% endif %}
+
 # configure the virtual env
 export WORKON_HOME={{ workonhome }}
 source virtualenvwrapper.sh
-if [ $? != '0' ]; then
-    pip install virtualenvwrapper.sh
-    source virtualenvwrapper.sh
-fi
+
 # create the env or reuse
 {% if make_env_dir %}
 mkvirtualenv {{ project }}
 {% else %}
 workon {{ project }}
 {% endif %}
+
 # install or update
-pip install django_configurator
 {% if update %}
 pip install --upgrade --no-deps {{ project }}
 pip install {{ project }}
@@ -26,5 +24,10 @@ pip install {{ project }}
 pip install {{ requirement }}
 {% endif %}
 install_status=$?
+
+# finally install because we want to use the same django as the main app
+pip install django_configurator
+
 deactivate
+
 exit ${install_status}

@@ -85,7 +85,7 @@ class Command(BaseCommand):
             os.rmdir(os.path.join(self.virtual_envs_path, "test233421"))
         _requirement = pkg_resources.Requirement.parse(options.get("project"))
         project_name = _requirement.project_name
-        project_path = os.path.join(self.virtual_envs_path, project_name)
+        project_install_path = os.path.join(self.virtual_envs_path, project_name)
         virtenv_dir_exists = os.path.isdir(self.virtual_envs_path)
 
         #  handle the DB installation + configuration
@@ -98,7 +98,7 @@ class Command(BaseCommand):
         #  handle the server installation
         server_type = options.get("server")
         if server_type:
-            all_ok = install_server(server_type, project_name, project_path, self.stdout, self.test)
+            all_ok = install_server(server_type, project_name, project_install_path, self.stdout, self.test)
             if not all_ok:
                 raise CommandError("Failed installing the DB")
 
@@ -106,7 +106,7 @@ class Command(BaseCommand):
         setup_params = {
             "virtenv_exists": virtenv_dir_exists,
             "workonhome": self.virtual_envs_path,
-            "make_env_dir": not os.path.isdir(project_path),
+            "make_env_dir": not os.path.isdir(project_install_path),
             "project": project_name,
             "update": options.get("update"),
             "requirement": str(_requirement)
@@ -135,7 +135,8 @@ class Command(BaseCommand):
                 os.unlink(tmpf)
             if status:
                 raise CommandError("Failed to execute install script")
-        activate_this = locate_activate_this(project_path)
+
+        activate_this = locate_activate_this(project_install_path)
 
 
         #  deploy config file

@@ -66,25 +66,19 @@ def install_server(server_type, project_name, project_path, output, test=True):
     """
     if not server_type:
         return True
-    output.write("Installing the server")
+    output.write(">> Installing the server")
     install_cmd = get_server_install_cmd(server_type)
-    t = get_template("server_install.sh")
-    c = Context({"server_install_cmd": install_cmd})
-    content = t.render(c)
     if not test:
-        _, t_path = tempfile.mkstemp("server.sh")
-        with open(t_path, "w") as f:
-            f.write(content)
-        os.chmod(t_path, 0o0755)
         o = ""
         try:
-            o = subprocess.check_output(t_path)
-        except subprocess.CalledProcessError:
+            o = subprocess.check_output(install_cmd)
+        except subprocess.CalledProcessError as err:
+            output.write(err.output)
             raise CommandError("Failed the server package installation")
         finally:
             output.write(o)
     else:
-        output.write(content)
+        output.write(install_cmd)
 
     # now define the config file for the server
     try:
@@ -99,7 +93,9 @@ def install_server(server_type, project_name, project_path, output, test=True):
             output.write(server_config)
         else:
             path = SERVER_CONFIG.get(server_type)
-            with open(os.path.join(path, project_name + ".conf"), "w") as s_cnf:
-                s_cnf.write(server_config)
-
+            try:
+                with open(os.path.join(path, project_name + ".conf"), "w") as s_cnf:
+                    s_cnf.write(server_config)
+            except OSError:
+                raise CommandError("Could not save the server config file in its final location")
     return True
