@@ -13,7 +13,7 @@ from django.core.management.base import CommandError
 from django.template.context import Context
 from django.template.loader import get_template
 
-SERVER_CONFIG = {"apache": "/etc/apache2/sites-enabled/"}
+SERVER_CONFIG = {"apache": "/etc/apache2/sites-available/"}
 
 
 def get_server_install_cmd(server_type):
@@ -32,7 +32,29 @@ def get_server_install_cmd(server_type):
         raise NotImplementedError("%s installation not defined" % server_type)
 
 
-def handle_server_config(server_type, project_name, project_path):
+def get_server_deploy_cmd(server_type, project_name):
+    if server_type == "apache":
+        return "a2ensite %s" % project_name
+    elif server_type == "django":
+        return None  # nothing special to do for django runserver
+    elif server_type is None:
+        return None
+    else:
+        raise NotImplementedError("%s deploy not defined" % server_type)
+
+
+def get_server_restart_cmd(server_type):
+    if server_type == "apache":
+        return "apache2ctl -k restart"
+    elif server_type == "django":
+        return None  # nothing special to do for django runserver
+    elif server_type is None:
+        return None
+    else:
+        raise NotImplementedError("%s deploy not defined" % server_type)
+
+
+def handle_server_config(vhost, server_type, project_name, project_path, base_path_config):
     """
     determine the server config files and the path where to store the resulting file
     :param server_type:
@@ -40,12 +62,19 @@ def handle_server_config(server_type, project_name, project_path):
     :param project_path:
     :return:
     """
+    wsgipath = os.path.join(project_path, "lib", "python2.7", "site-packages", project_name)
+    while not os.path.exists(os.path.join(wsgipath, "wsgi.py")):
+        wsgipath = raw_input("Please set the wsgi path, %s/wsgi.py does not exists: " % wsgipath)
+
+    staticdir = os.path.join(base_path_config, "static")
+    if not os.path.isdir(staticdir):
+        os.mkdir(staticdir)
     if server_type == "apache":
         return "apache_conf.conf", {"project": project_name,
-                                    "staticdir": None,
-                                    "servername": None,
+                                    "staticdir": staticdir,
+                                    "servername": vhost,
                                     "servermail": None,
-                                    "wsgipath": None}
+                                    "wsgipath": wsgipath}
     elif server_type == "django":
         return None, None
     elif server_type is None:
@@ -54,7 +83,7 @@ def handle_server_config(server_type, project_name, project_path):
         raise NotImplementedError("%s server config is missing" % server_type)
 
 
-def install_server(server_type, project_name, project_path, output, test=True):
+def install_server(vhost, server_type, project_name, project_path, base_path_config, output, test=True):
     """
     install and configure the server
     :param server_type:
@@ -82,7 +111,7 @@ def install_server(server_type, project_name, project_path, output, test=True):
 
     # now define the config file for the server
     try:
-        t_name, t_dict = handle_server_config(server_type, project_name, project_path)
+        t_name, t_dict = handle_server_config(vhost, server_type, project_name, project_path, base_path_config)
     except Exception as err:
         raise CommandError(str(err))
     if t_name:
@@ -98,4 +127,28 @@ def install_server(server_type, project_name, project_path, output, test=True):
                     s_cnf.write(server_config)
             except OSError:
                 raise CommandError("Could not save the server config file in its final location")
+    deploy_cmd = get_server_deploy_cmd(server_type, project_name)
+    if not test:
+        o = ""
+        try:
+            o = subprocess.check_output(deploy_cmd)
+        except subprocess.CalledProcessError as err:
+            output.write(err.output)
+            raise CommandError("Failed the server deploy call")
+        finally:
+            output.write(o)
+    else:
+        output.write(deploy_cmd)
+    restart_server_cmd = get_server_restart_cmd(server_type)
+    if not test:
+        o = ""
+        try:
+            o = subprocess.check_output(restart_server_cmd)
+        except subprocess.CalledProcessError as err:
+            output.write(err.output)
+            raise CommandError("Failed the server deploy call")
+        finally:
+            output.write(o)
+    else:
+        output.write(restart_server_cmd)
     return True

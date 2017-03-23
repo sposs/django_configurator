@@ -9,6 +9,9 @@ mkdir -p {{ workonhome }}
 export WORKON_HOME={{ workonhome }}
 source virtualenvwrapper.sh
 
+mkdir -p {{ base_path_config }}/static
+
+
 # create the env or reuse
 {% if make_env_dir %}
 mkvirtualenv {{ project }}

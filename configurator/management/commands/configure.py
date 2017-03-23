@@ -9,6 +9,7 @@ import pkg_resources
 from django.core.management.base import BaseCommand, CommandError
 import random
 import os
+import re
 
 from django.template.context import Context
 from django.template.loader import get_template
@@ -46,14 +47,20 @@ class Command(BaseCommand):
         parser.add_argument("-d", "--dbtype", dest="dbtype", choices=["postgres", "mysql", "mongo", "sqlite"])
         parser.add_argument("--dbname", dest="dbname", help="The name of the database")
         parser.add_argument("--update", dest="update", help="run the update of the project?", action="store_true")
+        parser.add_argument("--vhost", dest="vhost", help="The virtualhost served", required=True)
 
     def handle(self, *args, **options):
         # y = raw_input("Continue? [y,n] > ")
         # if y.lower() not in ["y", "yes"]:
         #     raise CommandError("Canceled before ending.")
-
+        self.base_path = options.get("base_path")
         self.virtual_envs_path = options.get("virtenv")
         self.test = options.get("test", False)
+        vhost = options.get("vhost")
+
+        project = options.get("project")
+        if not re.match(r"^[\w-]+=?=?[0-9.]*$", project):
+            raise CommandError("The project to install must not contain spaces nor special chars except =.")
 
         #  handle the pip config file
         if "HOME" in os.environ:
@@ -83,10 +90,12 @@ class Command(BaseCommand):
             raise CommandError("Write access forbidden in %s" % self.virtual_envs_path)
         else:
             os.rmdir(os.path.join(self.virtual_envs_path, "test233421"))
-        _requirement = pkg_resources.Requirement.parse(options.get("project"))
+
+        _requirement = pkg_resources.Requirement.parse(project)
         project_name = _requirement.project_name
         project_install_path = os.path.join(self.virtual_envs_path, project_name)
         virtenv_dir_exists = os.path.isdir(self.virtual_envs_path)
+        base_path_config = os.path.join(self.base_path, project_name)
 
         #  handle the DB installation + configuration
         db_type = options.get("dbtype")
@@ -95,13 +104,6 @@ class Command(BaseCommand):
         if db_type:
             db_user, db_pass = configure_database(db_type, dbname, self.stdout, self.test)
 
-        #  handle the server installation
-        server_type = options.get("server")
-        if server_type:
-            all_ok = install_server(server_type, project_name, project_install_path, self.stdout, self.test)
-            if not all_ok:
-                raise CommandError("Failed installing the DB")
-
         #  the basic script: install packages, configure the virtualenv
         setup_params = {
             "virtenv_exists": virtenv_dir_exists,
@@ -109,7 +111,8 @@ class Command(BaseCommand):
             "make_env_dir": not os.path.isdir(project_install_path),
             "project": project_name,
             "update": options.get("update"),
-            "requirement": str(_requirement)
+            "requirement": str(_requirement),
+            "base_path_config": base_path_config
         }
         t = get_template("setup.sh")
         c = Context(setup_params)
@@ -136,10 +139,45 @@ class Command(BaseCommand):
             if status:
                 raise CommandError("Failed to execute install script")
 
+        # create
+        if not self.test:
+            if not os.path.isdir("/logs"):
+                os.mkdir("/logs")
+                os.chmod("/logs", 0o0755)
+
         activate_this = locate_activate_this(project_install_path)
 
+        # handle config files
+        project_config = {"options": {"BASE_VIRTUALENV_ACTIVATE": activate_this,
+                                      "HOST_BASE_DEFAULT": vhost}}
+        t = get_template("project.conf")
+        c = Context(project_config)
+        project_secret = t.render(c)
+        if self.test:
+            self.stdout.write(project_secret)
+        else:
+            with open(os.path.join(base_path_config, "config.json"), "w") as cfg:
+                cfg.write(project_secret)
 
-        #  deploy config file
-        #  deploy apache file
+        project_secret = {"options": {"SECRET_KEY": self.secret_key,
+                                      "DB_USER": db_user,
+                                      "DB_PASS": db_pass}}
+        t = get_template("project.conf")
+        c = Context(project_secret)
+        secret_cfg = t.render(c)
+        if self.test:
+            self.stdout.write(secret_cfg)
+        else:
+            with open(os.path.join(base_path_config, "settings.json"), "w") as cfg:
+                cfg.write(secret_cfg)
+
+        #  handle the server installation/configuration.restart
+        server_type = options.get("server")
+        if server_type:
+
+            all_ok = install_server(vhost, server_type, project_name, project_install_path, base_path_config,
+                                    self.stdout, self.test)
+            if not all_ok:
+                raise CommandError("Failed installing the DB")
         #  email config
         #  DB config
