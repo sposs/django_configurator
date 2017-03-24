@@ -79,7 +79,6 @@ class Command(BaseCommand):
             f.write(t.render())
         os.close(fd)
         os.chmod(t_path, 0o0755)
-        self.stdout.write(t_path)
         time.sleep(0.5)
         if not self.test:
             output = ""
@@ -133,7 +132,7 @@ class Command(BaseCommand):
             os.chmod(tmpf, 0o0755)
             signal = status = 0
             try:
-                child = pexpect.spawn(tmpf)
+                child = pexpect.spawn(tmpf, timeout=600)
                 # child.logfile_read = self.stdout
                 child.expect(pexpect.EOF)
                 child.close()
