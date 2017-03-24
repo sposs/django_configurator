@@ -11,7 +11,7 @@ import random
 import os
 import re
 import time
-
+import logging
 from django.template.context import Context
 from django.template.loader import get_template
 from configurator.utils.database import configure_database
@@ -20,6 +20,8 @@ from configurator.utils.server import install_server
 from configurator.utils.utils import locate_activate_this
 
 __author__ = 'sposs'
+
+logger = logging.getLogger("configure")
 
 
 class Command(BaseCommand):
@@ -137,6 +139,7 @@ class Command(BaseCommand):
                 child.close()
                 status, signal = child.exitstatus, child.signalstatus
             except Exception as err:
+                logger.exception(err)
                 self.stderr.write(str(err))
                 raise CommandError("Failed to execute the install script")
             finally:
