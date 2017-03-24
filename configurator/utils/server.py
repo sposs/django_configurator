@@ -64,7 +64,8 @@ def handle_server_config(vhost, server_type, project_name, project_path, base_pa
     """
     wsgipath = os.path.join(project_path, "lib", "python2.7", "site-packages", project_name)
     while not os.path.exists(os.path.join(wsgipath, "wsgi.py")):
-        wsgipath = raw_input("Please set the wsgi path, %s/wsgi.py does not exists: " % wsgipath)
+        wsgipath = raw_input("Please set the wsgi parent path, %s/wsgi.py "
+                             "does not exists: " % wsgipath).strip("wsgi.py").strip()
 
     staticdir = os.path.join(base_path_config, "static")
     if not os.path.isdir(staticdir):
