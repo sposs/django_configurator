@@ -113,4 +113,4 @@ def locate_activate_this(path):
     file_to_find = "activate_this.py"
     for element in os.walk(path):
         if file_to_find in element[2]:
-            return os.path.join(element[1], file_to_find)
+            return os.path.join(element[0], file_to_find)
