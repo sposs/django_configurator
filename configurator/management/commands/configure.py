@@ -72,10 +72,10 @@ class Command(BaseCommand):
 
         #  install base packages
         t = get_template("base.sh")
-        _, t_path = tempfile.mkstemp(suffix="base.sh")
+        fd, t_path = tempfile.mkstemp(suffix="base.sh")
         with open(t_path, "w") as f:
             f.write(t.render())
-        os.close(t_path)
+        os.close(fd)
         os.chmod(t_path, 0o0755)
         self.stdout.write(t_path)
         time.sleep(0.5)
