@@ -75,6 +75,7 @@ class Command(BaseCommand):
         _, t_path = tempfile.mkstemp(suffix="base.sh")
         with open(t_path, "w") as f:
             f.write(t.render())
+        os.close(t_path)
         os.chmod(t_path, 0o0755)
         self.stdout.write(t_path)
         time.sleep(0.5)
