@@ -7,7 +7,6 @@ Date: 11.01.17
 """
 import os
 import subprocess
-import tempfile
 
 from django.core.management.base import CommandError
 from django.template.context import Context
@@ -101,7 +100,7 @@ def install_server(vhost, server_type, project_name, project_path, base_path_con
     if not test:
         o = ""
         try:
-            o = subprocess.check_output(install_cmd)
+            o = subprocess.check_output(install_cmd.split())
         except subprocess.CalledProcessError as err:
             output.write(err.output)
             raise CommandError("Failed the server package installation")
@@ -132,7 +131,7 @@ def install_server(vhost, server_type, project_name, project_path, base_path_con
     if not test:
         o = ""
         try:
-            o = subprocess.check_output(deploy_cmd)
+            o = subprocess.check_output(deploy_cmd.split())
         except subprocess.CalledProcessError as err:
             output.write(err.output)
             raise CommandError("Failed the server deploy call")
@@ -144,7 +143,7 @@ def install_server(vhost, server_type, project_name, project_path, base_path_con
     if not test:
         o = ""
         try:
-            o = subprocess.check_output(restart_server_cmd)
+            o = subprocess.check_output(restart_server_cmd.split())
         except subprocess.CalledProcessError as err:
             output.write(err.output)
             raise CommandError("Failed the server deploy call")
