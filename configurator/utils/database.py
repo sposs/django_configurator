@@ -158,6 +158,7 @@ def configure_database(db_type, dbname, output, test=True):
                 output.write(err)
                 raise CommandError("Failed to execute the DB user/DB setup")
     if not test and dbcmd:
+        output.write("Checking users registered in the DB system:")
         try:
             out = subprocess.check_output(db_pre_checks)
             output.write(out)

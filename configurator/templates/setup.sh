@@ -28,6 +28,9 @@ pip install {{ requirement }}
 {% endif %}
 install_status=$?
 
+export DJANGO_SETTINGS_MODULE={{ settings_base_path }}.settings
+django_admin collectstatic --noinput
+
 # finally install because we want to use the same django as the main app
 pip install django_configurator
 

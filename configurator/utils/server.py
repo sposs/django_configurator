@@ -7,13 +7,9 @@ Date: 11.01.17
 """
 import os
 import subprocess
-
-import pwd
 from django.core.management.base import CommandError
 from django.template.context import Context
 from django.template.loader import get_template
-
-from configurator.utils.utils import change_ownership
 
 SERVER_CONFIG = {"apache": "/etc/apache2/sites-available/"}
 
@@ -56,22 +52,27 @@ def get_server_restart_cmd(server_type):
         raise NotImplementedError("%s deploy not defined" % server_type)
 
 
-def handle_server_config(vhost, server_type, project_name, project_path, base_path_config):
+def handle_server_config(vhost, server_type, project_name, project_path, base_path_config, main_module):
     """
     determine the server config files and the path where to store the resulting file
+
+    :param vhost:
     :param server_type:
     :param project_name:
     :param project_path:
+    :param base_path_config:
+    :param main_module:
     :return:
     """
-    wsgipath = os.path.join(project_path, "lib", "python2.7", "site-packages", project_name)
+    wsgipath = os.path.join(project_path, "lib", "python2.7", "site-packages", main_module)
     while not os.path.exists(os.path.join(wsgipath, "wsgi.py")):
-        wsgipath = raw_input("Please set the wsgi parent path, %s/wsgi.py "
-                             "does not exists: " % wsgipath).rstrip("/").strip("wsgi.py").strip()
+        wsgipath = raw_input("Please set the wsgi parent path, %s "
+                             "does not "
+                             "exists: " % os.path.join(wsgipath, "wsgi.py")).rstrip("/").strip("wsgi.py").strip()
 
     staticdir = os.path.join(base_path_config, "static")
     if not os.path.isdir(staticdir):
-        os.mkdir(staticdir)
+        staticdir = None
     if server_type == "apache":
         return "apache_conf.conf", {"project": project_name,
                                     "staticdir": staticdir,
@@ -86,12 +87,16 @@ def handle_server_config(vhost, server_type, project_name, project_path, base_pa
         raise NotImplementedError("%s server config is missing" % server_type)
 
 
-def install_server(vhost, server_type, project_name, project_path, base_path_config, output, test=True):
+def install_server(vhost, server_type, project_name, project_path, base_path_config, main_module, output, test=True):
     """
-    install and configure the server
+    Install and configure the server
+
+    :param vhost: The VirtualHost
     :param server_type:
     :param project_name:
     :param project_path:
+    :param base_path_config:
+    :param main_module:
     :param output:
     :param test:
     :return:
@@ -114,7 +119,8 @@ def install_server(vhost, server_type, project_name, project_path, base_path_con
 
     # now define the config file for the server
     try:
-        t_name, t_dict = handle_server_config(vhost, server_type, project_name, project_path, base_path_config)
+        t_name, t_dict = handle_server_config(vhost, server_type, project_name, project_path, base_path_config,
+                                              main_module)
     except Exception as err:
         raise CommandError(str(err))
     if t_name:
@@ -146,16 +152,11 @@ def install_server(vhost, server_type, project_name, project_path, base_path_con
     user = None
     # need to grant the user access rights
     if server_type == "apache":
-        user = pwd.getpwnam("www-data")
-    else:
-        output.write("Cannot grant the server user the read rights, do it yourself")
-
-    if user:
-        change_ownership(project_path, user.pw_uid, user.pw_gid)
-        change_ownership(base_path_config, user.pw_uid, user.pw_gid)
+        user = "www-data"
 
     restart_server_cmd = get_server_restart_cmd(server_type)
     if not test:
+        output.write("Restarting the server")
         o = ""
         try:
             o = subprocess.check_output(restart_server_cmd.split())
@@ -166,4 +167,4 @@ def install_server(vhost, server_type, project_name, project_path, base_path_con
             output.write(o)
     else:
         output.write(restart_server_cmd)
-    return True
+    return True, user

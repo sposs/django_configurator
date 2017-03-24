@@ -6,6 +6,7 @@ import subprocess
 import pexpect
 import tempfile
 import pkg_resources
+import pwd
 from django.core.management.base import BaseCommand, CommandError
 import random
 import os
@@ -17,7 +18,7 @@ from django.template.loader import get_template
 from configurator.utils.database import configure_database
 from configurator.utils.pip_config import handle_pip_config
 from configurator.utils.server import install_server
-from configurator.utils.utils import locate_activate_this
+from configurator.utils.utils import locate_activate_this, change_ownership
 
 __author__ = 'sposs'
 
@@ -34,6 +35,12 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument("project", help="project name")
+        parser.add_argument("--vhost", dest="vhost", help="The virtualhost served", required=True)
+        parser.add_argument("-m", "--main", dest="mainmodule",
+                            help="Main module containing the wsgi and settings", required=True)
+        parser.add_argument("-s", "--server", dest="server", choices=["apache", "nginx", "django"])
+        parser.add_argument("-d", "--dbtype", dest="dbtype", choices=["postgres", "mysql", "mongo", "sqlite"])
+        parser.add_argument("--dbname", dest="dbname", help="The name of the database")
         parser.add_argument("-p", "--path", dest="base_path",
                             help="The root path", default=self.base_path)
         parser.add_argument("-e", "--virtualenv", dest="virtenv",
@@ -46,11 +53,7 @@ class Command(BaseCommand):
         parser.add_argument("--pipsecure", help="the pip server uses https", dest="pipsecure", action="store_true")
         parser.add_argument("--dev", dest="test", action="store_true", help="Do not run anything, "
                                                                             "only dump the templates")
-        parser.add_argument("-s", "--server", dest="server", choices=["apache", "nginx", "django"])
-        parser.add_argument("-d", "--dbtype", dest="dbtype", choices=["postgres", "mysql", "mongo", "sqlite"])
-        parser.add_argument("--dbname", dest="dbname", help="The name of the database")
         parser.add_argument("--update", dest="update", help="run the update of the project?", action="store_true")
-        parser.add_argument("--vhost", dest="vhost", help="The virtualhost served", required=True)
 
     def handle(self, *args, **options):
         # y = raw_input("Continue? [y,n] > ")
@@ -60,6 +63,7 @@ class Command(BaseCommand):
         self.virtual_envs_path = options.get("virtenv")
         self.test = options.get("test", False)
         vhost = options.get("vhost")
+        main_module = options.get("mainmodule")
 
         project = options.get("project")
         if not re.match(r"^[\w-]+=?=?[0-9.]*$", project):
@@ -117,7 +121,8 @@ class Command(BaseCommand):
             "project": project_name,
             "update": options.get("update"),
             "requirement": str(_requirement),
-            "base_path_config": base_path_config
+            "base_path_config": base_path_config,
+            "settings_base_path": main_module
         }
         t = get_template("setup.sh")
         c = Context(setup_params)
@@ -180,13 +185,22 @@ class Command(BaseCommand):
 
         #  handle the server installation/configuration.restart
         server_type = options.get("server")
+        server_user = None
         if server_type:
 
-            all_ok = install_server(vhost, server_type, project_name, project_install_path, base_path_config,
-                                    self.stdout, self.test)
+            all_ok, server_user = install_server(vhost, server_type, project_name, project_install_path,
+                                                 base_path_config, main_module,
+                                                 self.stdout, self.test)
             if not all_ok:
                 raise CommandError("Failed installing the DB")
 
+        self.stdout.write("To collect the static files, please make sure the project"
+                          " holds the static files in %s, then within the venv, "
+                          "call " % os.path.join(base_path_config, "static"))
+        if server_user:
+            server_user = pwd.getpwnam(server_user)
+            change_ownership(project_install_path, server_user.pw_uid, server_user.pw_gid)
+            change_ownership(base_path_config, server_user.pw_uid, server_user.pw_gid)
         #  email config
 
         #  DB config
