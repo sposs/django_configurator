@@ -76,6 +76,7 @@ class Command(BaseCommand):
         with open(t_path, "w") as f:
             f.write(t.render())
         os.chmod(t_path, 0o0755)
+        self.stdout.write(t_path)
         time.sleep(0.5)
         if not self.test:
             output = ""
