@@ -76,7 +76,7 @@ def get_db_config_cmd(dbtype, dbname, dbuser, output, test=True):
         return None
     if dbtype == "postgres":
         tn = "postgres.sh"
-        cmd = "su -c postgres"
+        cmd = "su postgres -c"
     else:
         raise NotImplementedError("%s template not defined" % dbtype)
     t = get_template(tn)
@@ -149,8 +149,11 @@ def configure_database(db_type, dbname, output, test=True):
     if not user_exists:
         dbcmd = get_db_config_cmd(db_type, dbname, dbuser, output, test)
         if not test and dbcmd:
-            child = pexpect.spawn(dbcmd)
-            child.logfile_read = output
-            handle_db_pass(child, db_type, dbpass)
-
+            try:
+                child = pexpect.spawn(dbcmd)
+                child.logfile_read = output
+                handle_db_pass(child, db_type, dbpass)
+            except Exception as err:
+                output.write(err)
+                raise CommandError("Failed to execute the DB user/DB setup")
     return dbuser, dbpass
