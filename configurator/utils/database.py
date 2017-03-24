@@ -61,9 +61,10 @@ def get_db_preinstall_checks(dbtype, output, test=True):
     """
     t = get_template("db_pre_install_checks.sh")
     c = Context({"db_type": dbtype})
-    _, t_path = tempfile.mkstemp(suffix="preinstall.sh")
+    fd, t_path = tempfile.mkstemp(suffix="preinstall.sh")
     with open(t_path, "w") as f:
         f.write(t.render(c))
+    os.close(fd)
     os.chmod(t_path, 0o0755)
     if test:
         output.write(t.render(c))
@@ -84,6 +85,7 @@ def get_db_config_cmd(dbtype, dbname, dbuser, output, test=True):
     tf, t_path = tempfile.mkstemp(suffix=tn)
     with open(t_path, "w") as f:
         f.write(content)
+    os.close(tf)
     os.chmod(t_path, 0o0755)
     if test:
         output.write(content)

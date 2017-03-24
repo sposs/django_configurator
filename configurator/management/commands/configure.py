@@ -124,9 +124,10 @@ class Command(BaseCommand):
         if self.test:
             self.stdout.write(setup_script)
         else:
-            _, tmpf = tempfile.mkstemp()
+            fd, tmpf = tempfile.mkstemp()
             with open(tmpf, "w") as script:
                 script.write(setup_script)
+            os.close(fd)
             os.chmod(tmpf, 0o0755)
             signal = status = 0
             try:
