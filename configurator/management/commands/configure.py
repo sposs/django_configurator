@@ -134,7 +134,7 @@ class Command(BaseCommand):
             signal = status = 0
             try:
                 child = pexpect.spawn(tmpf)
-                child.logfile_read = self.stdout
+                # child.logfile_read = self.stdout
                 child.expect(pexpect.EOF)
                 child.close()
                 status, signal = child.exitstatus, child.signalstatus
