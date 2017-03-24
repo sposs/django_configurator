@@ -10,6 +10,7 @@ from django.core.management.base import BaseCommand, CommandError
 import random
 import os
 import re
+import time
 
 from django.template.context import Context
 from django.template.loader import get_template
@@ -75,6 +76,7 @@ class Command(BaseCommand):
         with open(t_path, "w") as f:
             f.write(t.render())
         os.chmod(t_path, 0o0755)
+        time.sleep(0.5)
         if not self.test:
             output = ""
             try:
