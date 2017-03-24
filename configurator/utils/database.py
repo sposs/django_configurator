@@ -146,6 +146,7 @@ def configure_database(db_type, dbname, output, test=True):
             user_exists = True
     # if not, add it and create the DB. Else, assume the DB already exists
     # in any case, if there is an error during this execution. it's going to be a nightmare...
+    dbcmd = None
     if not user_exists:
         dbcmd = get_db_config_cmd(db_type, dbname, dbuser, output, test)
         if not test and dbcmd:
@@ -156,4 +157,13 @@ def configure_database(db_type, dbname, output, test=True):
             except Exception as err:
                 output.write(err)
                 raise CommandError("Failed to execute the DB user/DB setup")
+    if not test and dbcmd:
+        try:
+            out = subprocess.check_output(db_pre_checks)
+            output.write(out)
+        except subprocess.CalledProcessError as err:
+            output.write(err.output)
+            raise CommandError("Failed to execute the pre-checks")
+        if dbuser not in out:
+            output.write("User was not added, please execute the command '%s' yourself" % dbcmd)
     return dbuser, dbpass
