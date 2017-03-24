@@ -8,9 +8,12 @@ Date: 11.01.17
 import os
 import subprocess
 
+import pwd
 from django.core.management.base import CommandError
 from django.template.context import Context
 from django.template.loader import get_template
+
+from configurator.utils.utils import change_ownership
 
 SERVER_CONFIG = {"apache": "/etc/apache2/sites-available/"}
 
@@ -139,6 +142,18 @@ def install_server(vhost, server_type, project_name, project_path, base_path_con
             output.write(o)
     else:
         output.write(deploy_cmd)
+
+    user = None
+    # need to grant the user access rights
+    if server_type == "apache":
+        user = pwd.getpwnam("www-data")
+    else:
+        output.write("Cannot grant the server user the read rights, do it yourself")
+
+    if user:
+        change_ownership(project_path, user.pw_uid, user.pw_gid)
+        change_ownership(base_path_config, user.pw_uid, user.pw_gid)
+
     restart_server_cmd = get_server_restart_cmd(server_type)
     if not test:
         o = ""

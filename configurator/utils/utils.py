@@ -114,3 +114,19 @@ def locate_activate_this(path):
     for element in os.walk(path):
         if file_to_find in element[2]:
             return os.path.join(element[0], file_to_find)
+
+
+def change_ownership(path, uid, gid):
+    """
+    We need to be able to change the access rights to some users, for example the www-data in case of apache
+    :param path: the path to change
+    :param uid:
+    :param gid:
+    :return:
+    """
+    os.chown(path, uid, gid)
+    for root, dirs, files in os.walk(path):
+        for directory in dirs:
+            os.chown(os.path.join(root, directory), uid, gid)
+        for f in files:
+            os.chown(os.path.join(root, f), uid, gid)

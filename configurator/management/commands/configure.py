@@ -186,5 +186,7 @@ class Command(BaseCommand):
                                     self.stdout, self.test)
             if not all_ok:
                 raise CommandError("Failed installing the DB")
+
         #  email config
+
         #  DB config
